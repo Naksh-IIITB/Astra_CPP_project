@@ -32,6 +32,12 @@ Use the included 300-record Mall Customers-style dataset. The first two numeric 
 ./build/minicluster --input data/mall_customers_large.csv --k 5 --init kmeans++ --map
 ```
 
+Create a presentation-ready scatter plot. It opens in any browser because it is an SVG file.
+
+```bash
+./build/minicluster --input data/mall_customers_large.csv --k 5 --graph cluster_plot.svg
+```
+
 Compare initialization strategies fairly with the same seed:
 
 ```bash
@@ -45,6 +51,7 @@ Compare initialization strategies fairly with the same seed:
 - **Silhouette:** ranges from `-1` to `1`; larger values suggest better-separated clusters.
 - **Average/max radius:** shows each cluster's spread around its centroid.
 - **Outlier candidates:** members whose distance from their own centroid is at least 2.5 standard deviations above their cluster average.
+- **SVG graph:** color-coded customer points, centroid markers, axes, and cluster labels for a submission-ready visual.
 
 ## Project layout
 

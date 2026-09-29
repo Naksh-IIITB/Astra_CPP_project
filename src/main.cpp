@@ -1,4 +1,5 @@
 #include "analytics.h"
+#include "chart.h"
 #include "csv_io.h"
 #include "initializers.h"
 #include "kmeans.h"
@@ -20,6 +21,7 @@ struct Options {
     string initializer = "kmeans++";
     string input;
     string exportFile;
+    string graphFile;
     bool demo = false;
     bool map = false;
 };
@@ -32,6 +34,7 @@ void printUsage() {
          << "  --seed N           deterministic random seed (default: 42)\n"
          << "  --max-iterations N convergence limit (default: 200)\n"
          << "  --export file.csv  write point-to-cluster assignments\n"
+         << "  --graph file.svg   write a color-coded cluster scatter plot\n"
          << "  --map              print an ASCII cluster map\n";
 }
 
@@ -64,6 +67,7 @@ Options parseOptions(int argc, char* argv[]) {
         else if (argument == "--init") options.initializer = value();
         else if (argument == "--input") options.input = value();
         else if (argument == "--export") options.exportFile = value();
+        else if (argument == "--graph") options.graphFile = value();
         else throw invalid_argument("unknown option: " + argument);
     }
     if ((options.demo && !options.input.empty()) || (!options.demo && options.input.empty())) {
@@ -146,6 +150,10 @@ int main(int argc, char* argv[]) {
         if (!options.exportFile.empty()) {
             writeAssignmentsToCsv(options.exportFile, data, model.clusters());
             cout << "\nAssignments written to " << options.exportFile << '\n';
+        }
+        if (!options.graphFile.empty()) {
+            writeClusterSvg(options.graphFile, data, model.clusters());
+            cout << "Cluster graph written to " << options.graphFile << '\n';
         }
     } catch (const exception& error) {
         cerr << "Error: " << error.what() << "\n\n";

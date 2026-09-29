@@ -2,3 +2,4 @@
 *.o
 *.out
 cluster_assignments.csv
+cluster_plot.svg
