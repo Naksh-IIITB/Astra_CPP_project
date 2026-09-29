@@ -1,0 +1,4 @@
+/build/
+*.o
+*.out
+cluster_assignments.csv

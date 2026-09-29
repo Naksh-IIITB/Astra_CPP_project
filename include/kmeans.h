@@ -27,6 +27,7 @@ public:
     const vector<Cluster>& clusters() const noexcept;
     size_t iterations() const noexcept;
     bool converged() const noexcept;
+    double inertia() const noexcept;
 
     void printResults() const;
 
@@ -42,4 +43,5 @@ private:
     vector<Cluster> clusters_;
     size_t iterations_{};
     bool converged_{};
+    double inertia_{};
 };
