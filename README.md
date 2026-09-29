@@ -14,9 +14,8 @@ An explainable, dependency-free C++17 implementation of 2D K-Means clustering. I
 ## Build and test
 
 ```bash
-cmake -S . -B build
-cmake --build build
-ctest --test-dir build --output-on-failure
+make
+make test
 ```
 
 ## Run it
@@ -27,17 +26,17 @@ Use the deterministic synthetic customer demo:
 ./build/minicluster --demo --k 3 --seed 42 --map --export cluster_assignments.csv
 ```
 
-Use the included Mall Customers-style dataset. The first two numeric columns are used; a header row is allowed.
+Use the included 300-record Mall Customers-style dataset. The first two numeric columns are used; a header row is allowed.
 
 ```bash
-./build/minicluster --input data/mall_customers_2d.csv --k 5 --init kmeans++ --map
+./build/minicluster --input data/mall_customers_large.csv --k 5 --init kmeans++ --map
 ```
 
 Compare initialization strategies fairly with the same seed:
 
 ```bash
-./build/minicluster --input data/mall_customers_2d.csv --k 5 --init random --seed 42
-./build/minicluster --input data/mall_customers_2d.csv --k 5 --init kmeans++ --seed 42
+./build/minicluster --input data/mall_customers_large.csv --k 5 --init random --seed 42
+./build/minicluster --input data/mall_customers_large.csv --k 5 --init kmeans++ --seed 42
 ```
 
 ## Reading the report
