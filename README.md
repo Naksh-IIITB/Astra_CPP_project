@@ -26,23 +26,23 @@ Use the deterministic synthetic customer demo:
 ./build/minicluster --demo --k 3 --seed 42 --map --export cluster_assignments.csv
 ```
 
-Use the included 300-record Mall Customers-style dataset. The first two numeric columns are used; a header row is allowed.
+Use the included 930-record Mall Customers-style dataset. It deliberately has overlapping, unevenly spread customer profiles and unusual records, so the clusters are more realistic than perfectly separated synthetic groups. The first two numeric columns are used; a header row is allowed.
 
 ```bash
-./build/minicluster --input data/mall_customers_large.csv --k 5 --init kmeans++ --map
+./build/minicluster --input data/mall_customers_large.csv --k 6 --init kmeans++ --map
 ```
 
 Create a presentation-ready scatter plot. It opens in any browser because it is an SVG file.
 
 ```bash
-./build/minicluster --input data/mall_customers_large.csv --k 5 --graph cluster_plot.svg
+./build/minicluster --input data/mall_customers_large.csv --k 6 --graph cluster_plot.svg
 ```
 
 Compare initialization strategies fairly with the same seed:
 
 ```bash
-./build/minicluster --input data/mall_customers_large.csv --k 5 --init random --seed 42
-./build/minicluster --input data/mall_customers_large.csv --k 5 --init kmeans++ --seed 42
+./build/minicluster --input data/mall_customers_large.csv --k 6 --init random --seed 42
+./build/minicluster --input data/mall_customers_large.csv --k 6 --init kmeans++ --seed 42
 ```
 
 ## Reading the report
