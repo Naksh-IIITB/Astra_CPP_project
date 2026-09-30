@@ -20,7 +20,7 @@ test: $(BUILD_DIR)/minicluster_tests
 	./$(BUILD_DIR)/minicluster_tests
 
 run-demo: $(BUILD_DIR)/minicluster
-	./$(BUILD_DIR)/minicluster --demo --k 3 --seed 42 --map
+	./$(BUILD_DIR)/minicluster --demo --k 3 --seed 42 --graph demo_clusters
 
 clean:
 	rm -rf $(BUILD_DIR)

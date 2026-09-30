@@ -23,7 +23,6 @@ struct Options {
     string exportFile;
     string graphFile;
     bool demo = false;
-    bool map = false;
 };
 
 void printUsage() {
@@ -34,8 +33,7 @@ void printUsage() {
          << "  --seed N           deterministic random seed (default: 42)\n"
          << "  --max-iterations N convergence limit (default: 200)\n"
          << "  --export file.csv  write point-to-cluster assignments\n"
-         << "  --graph file.svg   write a color-coded cluster scatter plot\n"
-         << "  --map              print an ASCII cluster map\n";
+         << "  --graph file       write matching .svg and .png cluster plots\n";
 }
 
 size_t positiveSize(const string& value, const string& option) {
@@ -60,7 +58,6 @@ Options parseOptions(int argc, char* argv[]) {
             printUsage();
             exit(EXIT_SUCCESS);
         } else if (argument == "--demo") options.demo = true;
-        else if (argument == "--map") options.map = true;
         else if (argument == "--k") options.clusters = positiveSize(value(), argument);
         else if (argument == "--max-iterations") options.maxIterations = positiveSize(value(), argument);
         else if (argument == "--seed") options.seed = static_cast<unsigned int>(positiveSize(value(), argument));
@@ -91,25 +88,17 @@ vector<DataPoint> demoData(unsigned int seed) {
     return data;
 }
 
-void printMap(const vector<DataPoint>& data, const vector<Cluster>& clusters) {
-    constexpr int width = 56;
-    constexpr int height = 18;
-    double minX = data.front().x, maxX = data.front().x, minY = data.front().y, maxY = data.front().y;
-    for (const auto& point : data) {
-        minX = min(minX, point.x); maxX = max(maxX, point.x);
-        minY = min(minY, point.y); maxY = max(maxY, point.y);
+string graphBase(string filename) {
+    const string svgExtension = ".svg";
+    const string pngExtension = ".png";
+    if (filename.size() >= svgExtension.size() &&
+        filename.compare(filename.size() - svgExtension.size(), svgExtension.size(), svgExtension) == 0) {
+        filename.resize(filename.size() - svgExtension.size());
+    } else if (filename.size() >= pngExtension.size() &&
+               filename.compare(filename.size() - pngExtension.size(), pngExtension.size(), pngExtension) == 0) {
+        filename.resize(filename.size() - pngExtension.size());
     }
-    vector<string> canvas(height, string(width, ' '));
-    for (size_t cluster = 0; cluster < clusters.size(); ++cluster) {
-        const char marker = static_cast<char>('1' + (cluster % 9));
-        for (size_t point : clusters[cluster].memberIndices) {
-            const int x = static_cast<int>((data[point].x - minX) / max(0.001, maxX - minX) * (width - 1));
-            const int y = static_cast<int>((data[point].y - minY) / max(0.001, maxY - minY) * (height - 1));
-            canvas[height - 1 - y][x] = marker;
-        }
-    }
-    cout << "\nCluster map (x: " << minX << " to " << maxX << ", y: " << minY << " to " << maxY << ")\n";
-    for (const string& row : canvas) cout << '|' << row << "|\n";
+    return filename;
 }
 }  // namespace
 
@@ -146,14 +135,15 @@ int main(int argc, char* argv[]) {
             for (size_t index : outliers) cout << '#' << index << ' ';
             cout << '\n';
         }
-        if (options.map) printMap(data, model.clusters());
         if (!options.exportFile.empty()) {
             writeAssignmentsToCsv(options.exportFile, data, model.clusters());
             cout << "\nAssignments written to " << options.exportFile << '\n';
         }
         if (!options.graphFile.empty()) {
-            writeClusterSvg(options.graphFile, data, model.clusters());
-            cout << "Cluster graph written to " << options.graphFile << '\n';
+            const string base = graphBase(options.graphFile);
+            writeClusterSvg(base + ".svg", data, model.clusters());
+            writeClusterPng(base + ".png", data, model.clusters());
+            cout << "Cluster graphs written to " << base << ".svg and " << base << ".png\n";
         }
     } catch (const exception& error) {
         cerr << "Error: " << error.what() << "\n\n";

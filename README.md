@@ -1,6 +1,6 @@
 # MiniCluster
 
-MiniCluster is a dependency-free C++17 implementation of **2D K-Means clustering**. It groups unlabeled customer records using annual income and spending score, then explains the result with quality metrics, outlier detection, CSV export, an ASCII map, and an SVG scatter plot.
+MiniCluster is a dependency-free C++17 implementation of **2D K-Means clustering**. It groups unlabeled customer records using annual income and spending score, then explains the result with quality metrics, outlier detection, CSV export, and matching SVG/PNG scatter plots.
 
 This is intentionally an analysis tool rather than an algorithm snippet: initialization is interchangeable, experiments are repeatable, difficult cases are handled defensively, and the result is easy to present.
 
@@ -18,7 +18,7 @@ The data has overlapping, unevenly spread profiles rather than perfectly circula
 - **Reproducible results:** a configurable seed makes runs easy to repeat and compare.
 - **Robust convergence:** tolerance and iteration guards, plus empty-cluster recovery.
 - **Diagnostics:** inertia, silhouette score, cluster size, average/max radius, and outlier candidates.
-- **Visual output:** ASCII map, point-assignment CSV, and presentation-ready SVG plot.
+- **Visual output:** point-assignment CSV plus matching presentation-ready SVG and PNG plots.
 - **Zero dependencies:** builds with a standard C++17 compiler and `make`; CMake is not used.
 
 ## The K-Means algorithm
@@ -151,10 +151,10 @@ make test
 
 ## Run the project
 
-Run the realistic dataset with six clusters:
+Run the realistic dataset with six clusters and create polished graph files:
 
 ```bash
-./build/minicluster --input data/mall_customers_large.csv --k 6 --init kmeans++ --seed 42 --map
+./build/minicluster --input data/mall_customers_large.csv --k 6 --init kmeans++ --seed 42 --graph cluster_plot
 ```
 
 Generate the graph and point-assignment CSV:
@@ -186,8 +186,7 @@ Compare initialization strategies with the same seed:
 | `--init random\|kmeans++` | Centroid initialization strategy |
 | `--seed N` | Reproducible random seed |
 | `--max-iterations N` | Maximum assignment/update rounds |
-| `--map` | Print an ASCII scatter map |
-| `--graph file.svg` | Save a color-coded SVG scatter plot |
+| `--graph file` | Save matching color-coded `file.svg` and `file.png` plots |
 | `--export file.csv` | Save `point_id,x,y,cluster` assignments |
 
 ## Project structure
@@ -197,7 +196,7 @@ include/data_point.h     2D point type and distance operations
 include/initializers.h   Initializer interface and implementations
 include/kmeans.h         Cluster type and K-Means public API
 include/analytics.h      Silhouette, compactness, and outlier calculations
-include/chart.h          SVG graph export interface
+include/chart.h          SVG and PNG graph export interfaces
 src/                     Algorithm, CSV, diagnostics, graph, and CLI code
 data/                    Synthetic customer datasets
 docs/                    README visual assets

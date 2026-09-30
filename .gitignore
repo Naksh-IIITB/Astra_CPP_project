@@ -3,3 +3,6 @@
 *.out
 cluster_assignments.csv
 cluster_plot.svg
+cluster_plot.png
+demo_clusters.svg
+demo_clusters.png
