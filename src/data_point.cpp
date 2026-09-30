@@ -2,6 +2,8 @@
 
 #include <cmath>
 
+using namespace std;
+
 double squaredDistance(const DataPoint& first, const DataPoint& second) {
     const double dx = first.x - second.x;
     const double dy = first.y - second.y;

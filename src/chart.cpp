@@ -8,6 +8,8 @@
 #include <stdexcept>
 #include <vector>
 
+using namespace std;
+
 namespace {
 constexpr double kCanvasWidth = 1000.0;
 constexpr double kCanvasHeight = 680.0;

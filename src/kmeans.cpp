@@ -6,6 +6,8 @@
 #include <limits>
 #include <stdexcept>
 
+using namespace std;
+
 KMeans::KMeans(size_t clusterCount,
                const CentroidInitializer& initializer,
                size_t maxIterations,

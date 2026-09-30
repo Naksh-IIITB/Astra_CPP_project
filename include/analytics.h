@@ -5,6 +5,8 @@
 #include <cstddef>
 #include <vector>
 
+using namespace std;
+
 struct ClusterSummary {
     size_t index{};
     size_t size{};

@@ -4,6 +4,8 @@
 #include <numeric>
 #include <stdexcept>
 
+using namespace std;
+
 namespace {
 void validateInput(const vector<DataPoint>& data, size_t clusterCount) {
     if (clusterCount == 0 || clusterCount > data.size()) {

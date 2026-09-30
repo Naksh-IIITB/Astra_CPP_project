@@ -13,6 +13,8 @@
 #include <stdexcept>
 #include <string>
 
+using namespace std;
+
 namespace {
 struct Options {
     size_t clusters = 3;

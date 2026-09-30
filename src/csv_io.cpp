@@ -5,6 +5,8 @@
 #include <sstream>
 #include <stdexcept>
 
+using namespace std;
+
 namespace {
 bool parsePoint(const string& line, DataPoint& point) {
     string normalized = line;

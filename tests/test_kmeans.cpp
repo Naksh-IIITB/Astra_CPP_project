@@ -5,6 +5,8 @@
 #include <cassert>
 #include <iostream>
 
+using namespace std;
+
 int main() {
     const vector<DataPoint> data{{0, 0}, {0, 1}, {1, 0}, {10, 10}, {10, 11}, {11, 10}};
     KMeansPlusPlusInitializer initializer;

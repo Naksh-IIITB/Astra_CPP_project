@@ -5,6 +5,8 @@
 #include <limits>
 #include <numeric>
 
+using namespace std;
+
 namespace {
 double averageDistanceToCluster(const DataPoint& point,
                                 size_t ownIndex,
