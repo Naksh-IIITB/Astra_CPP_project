@@ -26,6 +26,7 @@ int main() {
     assert(model.clusters().size() == 2);
     assert(model.clusters()[0].memberIndices.size() + model.clusters()[1].memberIndices.size() == data.size());
     assert(model.inertia() < 5.0);
-    assert(silhouetteScore(data, model.clusters(), model.metric()) > 0.8);
+    const SilhouetteMetric silhouetteMetric;
+    assert(silhouetteMetric.compute(data, model.clusters()) > 0.8);
     std::cout << "All MiniCluster tests passed.\n";
 }

@@ -1,26 +1,55 @@
 #pragma once
 
-#include "kmeans.h"
 #include "distance_metric.h"
+#include "kmeans.h"
 
 #include <cstddef>
+#include <memory>
+#include <string>
 #include <vector>
 
-using namespace std;
+class ClusterMetric {
+public:
+    virtual ~ClusterMetric() = default;
+    virtual double compute(const std::vector<DataPoint>& data,
+                           const std::vector<Cluster>& clusters) const = 0;
+    virtual std::string name() const = 0;
+};
+
+class InertiaMetric final : public ClusterMetric {
+public:
+    double compute(const std::vector<DataPoint>& data,
+                   const std::vector<Cluster>& clusters) const override;
+    std::string name() const override;
+};
+
+class SilhouetteMetric final : public ClusterMetric {
+public:
+    explicit SilhouetteMetric(std::unique_ptr<DistanceMetric> metric = std::make_unique<EuclideanMetric>());
+    double compute(const std::vector<DataPoint>& data,
+                   const std::vector<Cluster>& clusters) const override;
+    std::string name() const override;
+
+private:
+    std::unique_ptr<DistanceMetric> metric_;
+};
 
 struct ClusterSummary {
-    size_t index{};
-    size_t size{};
+    std::size_t index{};
+    std::size_t size{};
     double averageDistance{};
     double maximumDistance{};
 };
 
-double silhouetteScore(const vector<DataPoint>& data, const vector<Cluster>& clusters,
-                       const DistanceMetric& metric);
-vector<ClusterSummary> summarizeClusters(const vector<DataPoint>& data,
-                                        const vector<Cluster>& clusters,
-                                        const DistanceMetric& metric);
-vector<size_t> findOutliers(const vector<DataPoint>& data,
-                            const vector<Cluster>& clusters,
-                            const DistanceMetric& metric,
-                            double zScoreThreshold = 2.5);
+class ClusterDiagnostics {
+public:
+    explicit ClusterDiagnostics(const DistanceMetric& metric) : metric_(metric) {}
+    std::vector<ClusterSummary> summarize(const std::vector<DataPoint>& data,
+                                          const std::vector<Cluster>& clusters) const;
+    std::vector<std::size_t> findOutliers(const std::vector<DataPoint>& data,
+                                          const std::vector<Cluster>& clusters,
+                                          double zScoreThreshold = 2.5) const;
+
+private:
+    const DistanceMetric& metric_;
+};

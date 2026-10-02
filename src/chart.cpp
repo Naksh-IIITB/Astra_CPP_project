@@ -1,4 +1,4 @@
-#include "chart.h"
+#include "exporter.h"
 
 #include <algorithm>
 #include <array>
@@ -177,9 +177,9 @@ void writePng(const string& filename, const Raster& image) {
 }
 }  // namespace
 
-void writeClusterSvg(const string& filename,
-                     const vector<DataPoint>& data,
-                     const vector<Cluster>& clusters) {
+void SvgExporter::write(const std::string& filename,
+                        const std::vector<DataPoint>& data,
+                        const std::vector<Cluster>& clusters) const {
     if (data.empty()) {
         throw invalid_argument("cannot chart an empty dataset");
     }
@@ -250,9 +250,11 @@ void writeClusterSvg(const string& filename,
            << "Dots: customers   X: centroids</text>\n</svg>\n";
 }
 
-void writeClusterPng(const string& filename,
-                     const vector<DataPoint>& data,
-                     const vector<Cluster>& clusters) {
+std::string SvgExporter::name() const { return "svg"; }
+
+void PngExporter::write(const std::string& filename,
+                        const std::vector<DataPoint>& data,
+                        const std::vector<Cluster>& clusters) const {
     if (data.empty()) throw invalid_argument("cannot chart an empty dataset");
     const Bounds bounds = boundsFor(data);
     Raster image(static_cast<int>(kCanvasWidth), static_cast<int>(kCanvasHeight), {255, 255, 255});
@@ -286,3 +288,5 @@ void writeClusterPng(const string& filename,
     }
     writePng(filename, image);
 }
+
+std::string PngExporter::name() const { return "png"; }

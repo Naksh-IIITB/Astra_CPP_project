@@ -1,13 +1,8 @@
 #pragma once
 
-#include "kmeans.h"
+#include "data_point.h"
 
 #include <string>
 #include <vector>
 
-using namespace std;
-
-vector<DataPoint> readPointsFromCsv(const string& filename);
-void writeAssignmentsToCsv(const string& filename,
-                           const vector<DataPoint>& data,
-                           const vector<Cluster>& clusters);
+std::vector<DataPoint> readPointsFromCsv(const std::string& filename);

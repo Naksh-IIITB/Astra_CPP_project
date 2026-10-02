@@ -1,6 +1,6 @@
 #include "analytics.h"
-#include "chart.h"
 #include "csv_io.h"
+#include "exporter.h"
 #include "distance_metric.h"
 #include "initializers.h"
 #include "kmeans.h"
@@ -122,8 +122,11 @@ int main(int argc, char* argv[]) {
         KMeans model(options.clusters, std::move(initializer), options.maxIterations, 1e-4, options.seed,
                      makeMetric(options.metric));
         model.fit(data);
-        const auto summaries = summarizeClusters(data, model.clusters(), model.metric());
-        const auto outliers = findOutliers(data, model.clusters(), model.metric());
+        const ClusterDiagnostics diagnostics(model.metric());
+        const auto summaries = diagnostics.summarize(data, model.clusters());
+        const auto outliers = diagnostics.findOutliers(data, model.clusters());
+        const InertiaMetric inertiaMetric;
+        const SilhouetteMetric silhouetteMetric(makeMetric(options.metric));
 
         cout << fixed << setprecision(3);
         cout << "MiniCluster report\n"
@@ -132,8 +135,8 @@ int main(int argc, char* argv[]) {
              << " | initializer: " << options.initializer << " | metric: " << model.metric().name()
              << " | seed: " << options.seed << "\n"
              << "Iterations: " << model.iterations() << " | converged: " << (model.converged() ? "yes" : "no")
-             << " | inertia: " << model.inertia() << " | silhouette: "
-             << silhouetteScore(data, model.clusters(), model.metric()) << "\n\n";
+             << " | inertia: " << inertiaMetric.compute(data, model.clusters()) << " | silhouette: "
+             << silhouetteMetric.compute(data, model.clusters()) << "\n\n";
         model.printResults();
         cout << "\nCompactness diagnostics\n";
         for (const auto& summary : summaries) {
@@ -147,13 +150,18 @@ int main(int argc, char* argv[]) {
             cout << '\n';
         }
         if (!options.exportFile.empty()) {
-            writeAssignmentsToCsv(options.exportFile, data, model.clusters());
+            const CsvExporter exporter;
+            exporter.write(options.exportFile, data, model.clusters());
             cout << "\nAssignments written to " << options.exportFile << '\n';
         }
         if (!options.graphFile.empty()) {
             const string base = graphBase(options.graphFile);
-            writeClusterSvg(base + ".svg", data, model.clusters());
-            writeClusterPng(base + ".png", data, model.clusters());
+            vector<unique_ptr<Exporter>> exporters;
+            exporters.emplace_back(make_unique<SvgExporter>());
+            exporters.emplace_back(make_unique<PngExporter>());
+            for (const auto& exporter : exporters) {
+                exporter->write(base + "." + exporter->name(), data, model.clusters());
+            }
             cout << "Cluster graphs written to " << base << ".svg and " << base << ".png\n";
         }
     } catch (const exception& error) {

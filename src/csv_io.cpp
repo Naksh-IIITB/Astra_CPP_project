@@ -1,4 +1,4 @@
-#include "csv_io.h"
+#include "exporter.h"
 
 #include <fstream>
 #include <iomanip>
@@ -52,9 +52,9 @@ vector<DataPoint> readPointsFromCsv(const string& filename) {
     return data;
 }
 
-void writeAssignmentsToCsv(const string& filename,
-                           const vector<DataPoint>& data,
-                           const vector<Cluster>& clusters) {
+void CsvExporter::write(const std::string& filename,
+                        const std::vector<DataPoint>& data,
+                        const std::vector<Cluster>& clusters) const {
     ofstream output(filename);
     if (!output) {
         throw runtime_error("could not write output file: " + filename);
@@ -68,3 +68,5 @@ void writeAssignmentsToCsv(const string& filename,
         }
     }
 }
+
+std::string CsvExporter::name() const { return "csv"; }
