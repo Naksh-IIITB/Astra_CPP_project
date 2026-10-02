@@ -1,6 +1,7 @@
 #include "analytics.h"
 #include "chart.h"
 #include "csv_io.h"
+#include "distance_metric.h"
 #include "initializers.h"
 #include "kmeans.h"
 
@@ -21,6 +22,7 @@ struct Options {
     size_t maxIterations = 200;
     unsigned int seed = 42;
     string initializer = "kmeans++";
+    string metric = "euclidean";
     string input;
     string exportFile;
     string graphFile;
@@ -32,6 +34,7 @@ void printUsage() {
          << "Usage: minicluster [--input file.csv | --demo] [options]\n"
          << "  --k N              number of clusters (default: 3)\n"
          << "  --init NAME        kmeans++ or random (default: kmeans++)\n"
+         << "  --metric NAME      euclidean, manhattan, or chebyshev (default: euclidean)\n"
          << "  --seed N           deterministic random seed (default: 42)\n"
          << "  --max-iterations N convergence limit (default: 200)\n"
          << "  --export file.csv  write point-to-cluster assignments\n"
@@ -64,6 +67,7 @@ Options parseOptions(int argc, char* argv[]) {
         else if (argument == "--max-iterations") options.maxIterations = positiveSize(value(), argument);
         else if (argument == "--seed") options.seed = static_cast<unsigned int>(positiveSize(value(), argument));
         else if (argument == "--init") options.initializer = value();
+        else if (argument == "--metric") options.metric = value();
         else if (argument == "--input") options.input = value();
         else if (argument == "--export") options.exportFile = value();
         else if (argument == "--graph") options.graphFile = value();
@@ -115,19 +119,21 @@ int main(int argc, char* argv[]) {
             initializer = std::make_unique<KMeansPlusPlusInitializer>();
         }
 
-        KMeans model(options.clusters, std::move(initializer), options.maxIterations, 1e-4, options.seed);
+        KMeans model(options.clusters, std::move(initializer), options.maxIterations, 1e-4, options.seed,
+                     makeMetric(options.metric));
         model.fit(data);
-        const auto summaries = summarizeClusters(data, model.clusters());
-        const auto outliers = findOutliers(data, model.clusters());
+        const auto summaries = summarizeClusters(data, model.clusters(), model.metric());
+        const auto outliers = findOutliers(data, model.clusters(), model.metric());
 
         cout << fixed << setprecision(3);
         cout << "MiniCluster report\n"
              << "==================\n"
              << "Points: " << data.size() << " | K: " << options.clusters
-             << " | initializer: " << options.initializer << " | seed: " << options.seed << "\n"
+             << " | initializer: " << options.initializer << " | metric: " << model.metric().name()
+             << " | seed: " << options.seed << "\n"
              << "Iterations: " << model.iterations() << " | converged: " << (model.converged() ? "yes" : "no")
              << " | inertia: " << model.inertia() << " | silhouette: "
-             << silhouetteScore(data, model.clusters()) << "\n\n";
+             << silhouetteScore(data, model.clusters(), model.metric()) << "\n\n";
         model.printResults();
         cout << "\nCompactness diagnostics\n";
         for (const auto& summary : summaries) {

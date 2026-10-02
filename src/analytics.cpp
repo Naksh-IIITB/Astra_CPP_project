@@ -11,7 +11,8 @@ namespace {
 double averageDistanceToCluster(const DataPoint& point,
                                 size_t ownIndex,
                                 const vector<DataPoint>& data,
-                                const Cluster& cluster) {
+                                const Cluster& cluster,
+                                const DistanceMetric& metric) {
     if (cluster.memberIndices.empty()) {
         return 0.0;
     }
@@ -19,7 +20,7 @@ double averageDistanceToCluster(const DataPoint& point,
     size_t count = 0;
     for (size_t member : cluster.memberIndices) {
         if (member != ownIndex) {
-            total += euclideanDistance(point, data[member]);
+            total += metric(point, data[member]);
             ++count;
         }
     }
@@ -27,7 +28,8 @@ double averageDistanceToCluster(const DataPoint& point,
 }
 }  // namespace
 
-double silhouetteScore(const vector<DataPoint>& data, const vector<Cluster>& clusters) {
+double silhouetteScore(const vector<DataPoint>& data, const vector<Cluster>& clusters,
+                       const DistanceMetric& metric) {
     if (data.size() < 2 || clusters.size() < 2) {
         return 0.0;
     }
@@ -36,12 +38,12 @@ double silhouetteScore(const vector<DataPoint>& data, const vector<Cluster>& clu
     for (size_t clusterIndex = 0; clusterIndex < clusters.size(); ++clusterIndex) {
         for (size_t pointIndex : clusters[clusterIndex].memberIndices) {
             const double intra = averageDistanceToCluster(
-                data[pointIndex], pointIndex, data, clusters[clusterIndex]);
+                data[pointIndex], pointIndex, data, clusters[clusterIndex], metric);
             double nearestOther = numeric_limits<double>::infinity();
             for (size_t other = 0; other < clusters.size(); ++other) {
                 if (other != clusterIndex && !clusters[other].memberIndices.empty()) {
                     nearestOther = min(nearestOther, averageDistanceToCluster(
-                        data[pointIndex], pointIndex, data, clusters[other]));
+                        data[pointIndex], pointIndex, data, clusters[other], metric));
                 }
             }
             const double denominator = max(intra, nearestOther);
@@ -53,7 +55,8 @@ double silhouetteScore(const vector<DataPoint>& data, const vector<Cluster>& clu
 }
 
 vector<ClusterSummary> summarizeClusters(const vector<DataPoint>& data,
-                                        const vector<Cluster>& clusters) {
+                                        const vector<Cluster>& clusters,
+                                        const DistanceMetric& metric) {
     vector<ClusterSummary> summaries;
     summaries.reserve(clusters.size());
     for (size_t index = 0; index < clusters.size(); ++index) {
@@ -61,7 +64,7 @@ vector<ClusterSummary> summarizeClusters(const vector<DataPoint>& data,
         double totalDistance = 0.0;
         double maximumDistance = 0.0;
         for (size_t pointIndex : cluster.memberIndices) {
-            const double memberDistance = euclideanDistance(data[pointIndex], cluster.centroid);
+            const double memberDistance = metric(data[pointIndex], cluster.centroid);
             totalDistance += memberDistance;
             maximumDistance = max(maximumDistance, memberDistance);
         }
@@ -74,6 +77,7 @@ vector<ClusterSummary> summarizeClusters(const vector<DataPoint>& data,
 
 vector<size_t> findOutliers(const vector<DataPoint>& data,
                             const vector<Cluster>& clusters,
+                            const DistanceMetric& metric,
                             double zScoreThreshold) {
     vector<size_t> outliers;
     for (const Cluster& cluster : clusters) {
@@ -83,7 +87,7 @@ vector<size_t> findOutliers(const vector<DataPoint>& data,
         vector<double> distances;
         distances.reserve(cluster.memberIndices.size());
         for (size_t pointIndex : cluster.memberIndices) {
-            distances.push_back(euclideanDistance(data[pointIndex], cluster.centroid));
+            distances.push_back(metric(data[pointIndex], cluster.centroid));
         }
         const double mean = accumulate(distances.begin(), distances.end(), 0.0) /
                             static_cast<double>(distances.size());

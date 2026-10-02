@@ -1,4 +1,5 @@
 #include "initializers.h"
+#include "distance_metric.h"
 
 #include <algorithm>
 #include <numeric>
@@ -14,7 +15,8 @@ void validateInput(const std::vector<DataPoint>& data, std::size_t clusterCount)
 
 std::vector<DataPoint> RandomInitializer::initialize(const std::vector<DataPoint>& data,
                                                       std::size_t clusterCount,
-                                                      std::mt19937& generator) const {
+                                                      std::mt19937& generator,
+                                                      const DistanceMetric&) const {
     validateInput(data, clusterCount);
     std::vector<std::size_t> indices(data.size());
     std::iota(indices.begin(), indices.end(), 0);
@@ -30,7 +32,8 @@ std::vector<DataPoint> RandomInitializer::initialize(const std::vector<DataPoint
 
 std::vector<DataPoint> KMeansPlusPlusInitializer::initialize(const std::vector<DataPoint>& data,
                                                               std::size_t clusterCount,
-                                                              std::mt19937& generator) const {
+                                                              std::mt19937& generator,
+                                                              const DistanceMetric& metric) const {
     validateInput(data, clusterCount);
     std::uniform_int_distribution<std::size_t> firstPoint(0, data.size() - 1);
     const std::size_t initialIndex = firstPoint(generator);
@@ -41,11 +44,11 @@ std::vector<DataPoint> KMeansPlusPlusInitializer::initialize(const std::vector<D
 
     while (centroids.size() < clusterCount) {
         for (std::size_t point = 0; point < data.size(); ++point) {
-            double nearest = squaredDistance(data[point], centroids.front());
+            double nearest = metric(data[point], centroids.front());
             for (std::size_t centroid = 1; centroid < centroids.size(); ++centroid) {
-                nearest = std::min(nearest, squaredDistance(data[point], centroids[centroid]));
+                nearest = std::min(nearest, metric(data[point], centroids[centroid]));
             }
-            weights[point] = chosen[point] ? 0.0 : nearest;
+            weights[point] = chosen[point] ? 0.0 : nearest * nearest;
         }
 
         const double totalWeight = std::accumulate(weights.begin(), weights.end(), 0.0);
@@ -65,4 +68,10 @@ std::vector<DataPoint> KMeansPlusPlusInitializer::initialize(const std::vector<D
         chosen[selected] = true;
     }
     return centroids;
+}
+
+std::unique_ptr<CentroidInitializer> makeInitializer(const std::string& name) {
+    if (name == "random") return std::make_unique<RandomInitializer>();
+    if (name == "kmeans++") return std::make_unique<KMeansPlusPlusInitializer>();
+    throw std::invalid_argument("unknown initializer: " + name);
 }

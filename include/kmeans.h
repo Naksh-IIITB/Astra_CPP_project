@@ -1,6 +1,7 @@
 #pragma once
 
 #include "data_point.h"
+#include "distance_metric.h"
 #include "initializers.h"
 
 #include <cstddef>
@@ -19,7 +20,8 @@ public:
            std::unique_ptr<CentroidInitializer> initializer,
            std::size_t maxIterations = 100,
            double tolerance = 1e-4,
-           unsigned int seed = std::random_device{}());
+           unsigned int seed = std::random_device{}(),
+           std::unique_ptr<DistanceMetric> metric = std::make_unique<EuclideanMetric>());
 
     void fit(const std::vector<DataPoint>& data);
 
@@ -27,6 +29,7 @@ public:
     std::size_t iterations() const noexcept;
     bool converged() const noexcept;
     double inertia() const noexcept;
+    const DistanceMetric& metric() const noexcept;
 
     void printResults() const;
 
@@ -36,6 +39,7 @@ private:
 
     std::size_t clusterCount_;
     std::unique_ptr<CentroidInitializer> initializer_;
+    std::unique_ptr<DistanceMetric> metric_;
     std::size_t maxIterations_;
     double tolerance_;
     std::mt19937 generator_;
