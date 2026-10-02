@@ -106,11 +106,11 @@ bool KMeans::converged() const noexcept { return converged_; }
 double KMeans::inertia() const noexcept { return inertia_; }
 const DistanceMetric& KMeans::metric() const noexcept { return *metric_; }
 
-void KMeans::printResults() const {
-    std::cout << std::fixed << std::setprecision(3);
+void KMeans::printResults(std::ostream& output) const {
+    output << std::fixed << std::setprecision(3);
     for (std::size_t index = 0; index < clusters_.size(); ++index) {
         const Cluster& cluster = clusters_[index];
-        std::cout << "Cluster " << index + 1 << ": centroid " << cluster.centroid
-                  << ", members: " << cluster.memberIndices.size() << '\n';
+        output << "Cluster " << index + 1 << ": centroid " << cluster.centroid
+               << ", members: " << cluster.memberIndices.size() << '\n';
     }
 }

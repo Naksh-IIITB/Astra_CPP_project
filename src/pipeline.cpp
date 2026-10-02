@@ -49,7 +49,7 @@ void Pipeline::run(std::ostream& output) {
            << "Iterations: " << model_->iterations() << " | converged: "
            << (model_->converged() ? "yes" : "no") << " | inertia: " << inertia
            << " | silhouette: " << silhouette << "\n\n";
-    model_->printResults();
+    model_->printResults(output);
     output << "\nCompactness diagnostics\n";
     for (const ClusterSummary& summary : summaries) {
         output << "  C" << summary.index + 1 << ": avg radius " << summary.averageDistance

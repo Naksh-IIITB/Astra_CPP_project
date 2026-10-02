@@ -4,6 +4,7 @@
 #include "kmeans.h"
 #include "data_loader.h"
 #include "interactive_cli.h"
+#include "pipeline.h"
 
 #include <cassert>
 #include <cmath>
@@ -72,6 +73,13 @@ int main() {
     goldenRandom.fit(largeData);
     assert(goldenRandom.iterations() == 22);
     assert(approximatelyEqual(goldenRandom.inertia(), 209435.951));
+
+    PipelineOptions pipelineOptions;
+    pipelineOptions.clusterCount = 2;
+    pipelineOptions.seed = 17;
+    std::ostringstream pipelineOutput;
+    Pipeline(std::make_unique<DemoLoader>(17), pipelineOptions).run(pipelineOutput);
+    assert(pipelineOutput.str().find("Cluster 1: centroid") != std::string::npos);
 
     std::istringstream interactiveInput(
         "1\n"

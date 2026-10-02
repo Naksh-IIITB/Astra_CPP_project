@@ -18,15 +18,22 @@ The project is deliberately structured to demonstrate object-oriented design: ev
 
 ```mermaid
 classDiagram
+    direction LR
+
+    class Main {
+        +main(argc, argv)
+    }
     class DataPoint {
         +double x
         +double y
         +norm2() double
+        +operator+=()
     }
     class KMeans {
         +fit(data)
         +clusters()
         +inertia()
+        +metric()
     }
     class CentroidInitializer {
         <<abstract>>
@@ -50,6 +57,7 @@ classDiagram
     class CsvLoader
     class TsvLoader
     class DemoLoader
+    class LoadError
     class Exporter {
         <<abstract>>
         +write(file, data, clusters)
@@ -69,28 +77,48 @@ classDiagram
         +run(session)
     }
     class InteractiveCli
+    class Session {
+        +data
+        +k
+        +initializerName
+        +metricName
+        +lastModel
+    }
     class Pipeline
 
-    KMeans --> CentroidInitializer : owns
-    KMeans --> DistanceMetric : owns
+    Main --> Pipeline : flag workflow
+    Main --> InteractiveCli : menu workflow
+    Pipeline *-- DataLoader : owns
+    Pipeline *-- KMeans : owns after load
+    Pipeline *-- ClusterMetric : owns many
+    Pipeline *-- Exporter : owns many
+    Pipeline ..> CentroidInitializer : factory
+    Pipeline ..> DistanceMetric : factory
+    KMeans *-- CentroidInitializer : unique_ptr
+    KMeans *-- DistanceMetric : unique_ptr
+    KMeans --> DataPoint : clusters points
     CentroidInitializer <|-- RandomInitializer
     CentroidInitializer <|-- KMeansPlusPlusInitializer
+    KMeansPlusPlusInitializer --> DistanceMetric : seeded by
     DistanceMetric <|-- EuclideanMetric
     DistanceMetric <|-- ManhattanMetric
     DistanceMetric <|-- ChebyshevMetric
     DataLoader <|-- CsvLoader
     CsvLoader <|-- TsvLoader
     DataLoader <|-- DemoLoader
+    CsvLoader ..> LoadError : throws
     Exporter <|-- CsvExporter
     Exporter <|-- SvgExporter
     Exporter <|-- PngExporter
     ClusterMetric <|-- InertiaMetric
     ClusterMetric <|-- SilhouetteMetric
-    InteractiveCli --> MenuAction : owns many
-    Pipeline --> DataLoader : owns
-    Pipeline --> KMeans : owns
-    Pipeline --> ClusterMetric : owns many
-    Pipeline --> Exporter : owns many
+    SilhouetteMetric *-- DistanceMetric : unique_ptr
+    InteractiveCli *-- MenuAction : owns many
+    InteractiveCli *-- Session : owns
+    MenuAction --> Session : updates
+    MenuAction ..> DataLoader : load action
+    MenuAction ..> Exporter : export action
+    MenuAction ..> KMeans : run action
 ```
 
 ## Build and test

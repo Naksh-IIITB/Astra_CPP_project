@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <ostream>
 #include <random>
 #include <vector>
 
@@ -31,7 +32,7 @@ public:
     double inertia() const noexcept;
     const DistanceMetric& metric() const noexcept;
 
-    void printResults() const;
+    void printResults(std::ostream& output) const;
 
 private:
     void assignPoints(const std::vector<DataPoint>& data);
