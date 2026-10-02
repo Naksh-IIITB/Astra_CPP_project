@@ -8,9 +8,22 @@
 #include <stdexcept>
 #include <vector>
 
-using namespace std;
-
 namespace {
+using std::abs;
+using std::array;
+using std::ios;
+using std::max;
+using std::min;
+using std::ofstream;
+using std::ptrdiff_t;
+using std::runtime_error;
+using std::size_t;
+using std::streamsize;
+using std::string;
+using std::uint16_t;
+using std::uint32_t;
+using std::uint8_t;
+using std::vector;
 constexpr double kCanvasWidth = 1000.0;
 constexpr double kCanvasHeight = 680.0;
 constexpr double kLeft = 95.0;
@@ -181,7 +194,7 @@ void SvgExporter::write(const std::string& filename,
                         const std::vector<DataPoint>& data,
                         const std::vector<Cluster>& clusters) const {
     if (data.empty()) {
-        throw invalid_argument("cannot chart an empty dataset");
+        throw std::invalid_argument("cannot chart an empty dataset");
     }
     ofstream output(filename);
     if (!output) {
@@ -191,7 +204,7 @@ void SvgExporter::write(const std::string& filename,
     const Bounds bounds = boundsFor(data);
     const double plotWidth = kCanvasWidth - kLeft - kRight;
     const double plotHeight = kCanvasHeight - kTop - kBottom;
-    output << fixed << setprecision(2);
+    output << std::fixed << std::setprecision(2);
     output << "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1000\" height=\"680\" "
            << "viewBox=\"0 0 1000 680\">\n"
            << "<rect width=\"1000\" height=\"680\" fill=\"#ffffff\"/>\n"
@@ -255,7 +268,7 @@ std::string SvgExporter::name() const { return "svg"; }
 void PngExporter::write(const std::string& filename,
                         const std::vector<DataPoint>& data,
                         const std::vector<Cluster>& clusters) const {
-    if (data.empty()) throw invalid_argument("cannot chart an empty dataset");
+    if (data.empty()) throw std::invalid_argument("cannot chart an empty dataset");
     const Bounds bounds = boundsFor(data);
     Raster image(static_cast<int>(kCanvasWidth), static_cast<int>(kCanvasHeight), {255, 255, 255});
     const Rgb grid{226, 232, 240};

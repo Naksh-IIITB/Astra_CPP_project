@@ -11,8 +11,6 @@
 #include <iostream>
 #include <sstream>
 
-using namespace std;
-
 int main() {
     const DataPoint origin{0, 0};
     const DataPoint point{3, 4};
@@ -23,7 +21,7 @@ int main() {
     assert(manhattan(origin, point) == 7.0);
     assert(chebyshev(origin, point) == 4.0);
 
-    const vector<DataPoint> data{{0, 0}, {0, 1}, {1, 0}, {10, 10}, {10, 11}, {11, 10}};
+    const std::vector<DataPoint> data{{0, 0}, {0, 1}, {1, 0}, {10, 10}, {10, 11}, {11, 10}};
     KMeans model(2, std::make_unique<KMeansPlusPlusInitializer>(), 100, 1e-8, 17);
     model.fit(data);
 
