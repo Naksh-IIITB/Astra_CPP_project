@@ -3,10 +3,12 @@
 #include "initializers.h"
 #include "kmeans.h"
 #include "data_loader.h"
+#include "interactive_cli.h"
 
 #include <cassert>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 
 using namespace std;
 
@@ -47,5 +49,23 @@ int main() {
     try { CsvLoader("/private/tmp/no-such-minicluster-file.csv").load(); }
     catch (const LoadError&) { missingFileFailed = true; }
     assert(missingFileFailed);
+
+    std::istringstream interactiveInput(
+        "1\n"
+        "data/mall_customers_large.csv\n\n\n\n"
+        "2\n6\n3\nkmeans++\n5\n42\n6\n0\n");
+    std::ostringstream interactiveOutput;
+    InteractiveCli(interactiveInput, interactiveOutput).run();
+    assert(interactiveOutput.str().find("inertia: 211729.084") != std::string::npos);
+
+    std::istringstream invalidInput("6\ninvalid\n0\n");
+    std::ostringstream invalidOutput;
+    InteractiveCli(invalidInput, invalidOutput).run();
+    assert(invalidOutput.str().find("Load data before using this action.") != std::string::npos);
+    assert(invalidOutput.str().find("Choose a menu number") != std::string::npos);
+
+    std::istringstream eofInput("1\n");
+    std::ostringstream eofOutput;
+    InteractiveCli(eofInput, eofOutput).run();
     std::cout << "All MiniCluster tests passed.\n";
 }

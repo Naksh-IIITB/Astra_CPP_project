@@ -1,7 +1,7 @@
 CXX := c++
 CXXFLAGS := -std=c++17 -Wall -Wextra -Wpedantic -Iinclude
 BUILD_DIR := build
-CORE_SOURCES := src/analytics.cpp src/chart.cpp src/data_loader.cpp src/data_point.cpp src/distance_metric.cpp src/exporter.cpp src/initializers.cpp src/kmeans.cpp
+CORE_SOURCES := src/analytics.cpp src/chart.cpp src/data_loader.cpp src/data_point.cpp src/distance_metric.cpp src/exporter.cpp src/initializers.cpp src/interactive_cli.cpp src/kmeans.cpp
 
 .PHONY: all test run-demo clean
 
