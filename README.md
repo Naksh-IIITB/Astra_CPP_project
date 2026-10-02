@@ -16,109 +16,188 @@ The project is deliberately structured to demonstrate object-oriented design: ev
 
 ## Architecture
 
+The diagrams are split by responsibility to keep relationships readable. In each view, a solid diamond means **owns**, a hollow triangle means **inherits**, and a dotted arrow means **uses or creates**.
+
+### 1. Core clustering engine
+
 ```mermaid
 classDiagram
     direction LR
 
-    class Main {
-        +main(argc, argv)
-    }
     class DataPoint {
+        <<2D customer coordinate>>
         +double x
         +double y
         +norm2() double
         +operator+=()
     }
     class KMeans {
+        <<assign-update convergence engine>>
         +fit(data)
         +clusters()
         +inertia()
         +metric()
     }
     class CentroidInitializer {
-        <<abstract>>
+        <<abstract: choose starting centroids>>
         +initialize(data, k, generator, metric)
     }
-    class RandomInitializer
-    class KMeansPlusPlusInitializer
+    class RandomInitializer {
+        <<random distinct point seeds>>
+    }
+    class KMeansPlusPlusInitializer {
+        <<distance-weighted spread-out seeds>>
+    }
     class DistanceMetric {
-        <<abstract>>
+        <<abstract: compare two points>>
         +operator()(a, b) double
         +name() string
     }
-    class EuclideanMetric
-    class ManhattanMetric
-    class ChebyshevMetric
+    class EuclideanMetric {
+        <<straight-line distance>>
+    }
+    class ManhattanMetric {
+        <<horizontal plus vertical distance>>
+    }
+    class ChebyshevMetric {
+        <<largest coordinate difference>>
+    }
+
+    KMeans *-- CentroidInitializer : owns strategy
+    KMeans *-- DistanceMetric : owns strategy
+    KMeans --> DataPoint : clusters
+    CentroidInitializer <|-- RandomInitializer
+    CentroidInitializer <|-- KMeansPlusPlusInitializer
+    KMeansPlusPlusInitializer ..> DistanceMetric : weights seeds
+    DistanceMetric <|-- EuclideanMetric
+    DistanceMetric <|-- ManhattanMetric
+    DistanceMetric <|-- ChebyshevMetric
+```
+
+### 2. Data, analysis, and export adapters
+
+```mermaid
+classDiagram
+    direction LR
+
     class DataLoader {
-        <<abstract>>
+        <<abstract: produce DataPoint records>>
         +load() vector~DataPoint~
         +describe() string
     }
-    class CsvLoader
-    class TsvLoader
-    class DemoLoader
-    class LoadError
-    class Exporter {
-        <<abstract>>
-        +write(file, data, clusters)
+    class CsvLoader {
+        <<parse configurable CSV rows>>
+        +parseRow(line, delimiter, point)
     }
-    class CsvExporter
-    class SvgExporter
-    class PngExporter
+    class TsvLoader {
+        <<CSV loader fixed to tab delimiter>>
+    }
+    class DemoLoader {
+        <<create deterministic sample customers>>
+    }
+    class LoadError {
+        <<input problem with useful message>>
+    }
     class ClusterMetric {
-        <<abstract>>
+        <<abstract: score completed clusters>>
         +compute(data, clusters) double
     }
-    class InertiaMetric
-    class SilhouetteMetric
-    class MenuAction {
-        <<abstract>>
-        +label() string
-        +run(session)
+    class InertiaMetric {
+        <<sum squared centroid distances>>
     }
-    class InteractiveCli
+    class SilhouetteMetric {
+        <<separation versus compactness score>>
+    }
+    class ClusterDiagnostics {
+        <<summaries and z-score outliers>>
+        +summarize()
+        +findOutliers()
+    }
+    class Exporter {
+        <<abstract: write final result>>
+        +write(file, data, clusters)
+    }
+    class CsvExporter {
+        <<point-to-cluster assignments>>
+    }
+    class SvgExporter {
+        <<scalable labelled scatter plot>>
+    }
+    class PngExporter {
+        <<portable raster scatter plot>>
+    }
+
+    DataLoader <|-- CsvLoader
+    CsvLoader <|-- TsvLoader
+    DataLoader <|-- DemoLoader
+    CsvLoader ..> LoadError : throws
+    ClusterMetric <|-- InertiaMetric
+    ClusterMetric <|-- SilhouetteMetric
+    ClusterDiagnostics ..> DistanceMetric : measures with
+    Exporter <|-- CsvExporter
+    Exporter <|-- SvgExporter
+    Exporter <|-- PngExporter
+```
+
+### 3. Application workflows
+
+```mermaid
+classDiagram
+    direction LR
+
+    class Main {
+        <<selects flag or menu mode>>
+        +main(argc, argv)
+    }
+    class Pipeline {
+        <<non-interactive load-fit-report-export>>
+        +run(output)
+    }
+    class InteractiveCli {
+        <<menu loop and action dispatcher>>
+        +run()
+    }
     class Session {
+        <<current user choices and last result>>
         +data
         +k
         +initializerName
         +metricName
         +lastModel
     }
-    class Pipeline
+    class MenuAction {
+        <<abstract: one menu operation>>
+        +label() string
+        +run(session)
+    }
+    class LoadDataAction {
+        <<loads a file into Session>>
+    }
+    class RunClusteringAction {
+        <<builds and fits KMeans>>
+    }
+    class ExportResultsAction {
+        <<writes chosen result format>>
+    }
+    class CompareInitializersAction {
+        <<compares random and K-Means++>>
+    }
 
-    Main --> Pipeline : flag workflow
-    Main --> InteractiveCli : menu workflow
+    Main --> Pipeline : flags
+    Main --> InteractiveCli : no args or interactive
     Pipeline *-- DataLoader : owns
-    Pipeline *-- KMeans : owns after load
+    Pipeline *-- KMeans : owns
     Pipeline *-- ClusterMetric : owns many
     Pipeline *-- Exporter : owns many
     Pipeline ..> CentroidInitializer : factory
     Pipeline ..> DistanceMetric : factory
-    KMeans *-- CentroidInitializer : unique_ptr
-    KMeans *-- DistanceMetric : unique_ptr
-    KMeans --> DataPoint : clusters points
-    CentroidInitializer <|-- RandomInitializer
-    CentroidInitializer <|-- KMeansPlusPlusInitializer
-    KMeansPlusPlusInitializer --> DistanceMetric : seeded by
-    DistanceMetric <|-- EuclideanMetric
-    DistanceMetric <|-- ManhattanMetric
-    DistanceMetric <|-- ChebyshevMetric
-    DataLoader <|-- CsvLoader
-    CsvLoader <|-- TsvLoader
-    DataLoader <|-- DemoLoader
-    CsvLoader ..> LoadError : throws
-    Exporter <|-- CsvExporter
-    Exporter <|-- SvgExporter
-    Exporter <|-- PngExporter
-    ClusterMetric <|-- InertiaMetric
-    ClusterMetric <|-- SilhouetteMetric
-    SilhouetteMetric *-- DistanceMetric : unique_ptr
-    InteractiveCli *-- MenuAction : owns many
     InteractiveCli *-- Session : owns
-    MenuAction --> Session : updates
-    MenuAction ..> DataLoader : load action
-    MenuAction ..> Exporter : export action
-    MenuAction ..> KMeans : run action
+    InteractiveCli *-- MenuAction : owns many
+    MenuAction <|-- LoadDataAction
+    MenuAction <|-- RunClusteringAction
+    MenuAction <|-- ExportResultsAction
+    MenuAction <|-- CompareInitializersAction
+    MenuAction --> Session : reads and updates
 ```
 
 ## Build and test
