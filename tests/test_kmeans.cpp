@@ -6,6 +6,7 @@
 #include "interactive_cli.h"
 
 #include <cassert>
+#include <cmath>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -49,6 +50,30 @@ int main() {
     try { CsvLoader("/private/tmp/no-such-minicluster-file.csv").load(); }
     catch (const LoadError&) { missingFileFailed = true; }
     assert(missingFileFailed);
+
+    const std::vector<DataPoint> largeData = CsvLoader("data/mall_customers_large.csv").load();
+    const auto approximatelyEqual = [](double first, double second) {
+        return std::abs(first - second) < 0.001;
+    };
+    const EuclideanMetric metric;
+    RandomInitializer randomInitializer;
+    KMeansPlusPlusInitializer plusPlusInitializer;
+    const CentroidInitializer& randomPolymorphic = randomInitializer;
+    const CentroidInitializer& plusPlusPolymorphic = plusPlusInitializer;
+    std::mt19937 randomGenerator(42);
+    std::mt19937 plusPlusGenerator(42);
+    assert(randomPolymorphic.initialize(largeData, 6, randomGenerator, metric).size() == 6);
+    assert(plusPlusPolymorphic.initialize(largeData, 6, plusPlusGenerator, metric).size() == 6);
+
+    KMeans goldenPlusPlus(6, makeInitializer("kmeans++"), 200, 1e-4, 42, makeMetric("euclidean"));
+    goldenPlusPlus.fit(largeData);
+    assert(goldenPlusPlus.iterations() == 46);
+    assert(approximatelyEqual(goldenPlusPlus.inertia(), 211729.084));
+
+    KMeans goldenRandom(6, makeInitializer("random"), 200, 1e-4, 42, makeMetric("euclidean"));
+    goldenRandom.fit(largeData);
+    assert(goldenRandom.iterations() == 22);
+    assert(approximatelyEqual(goldenRandom.inertia(), 209435.951));
 
     std::istringstream interactiveInput(
         "1\n"

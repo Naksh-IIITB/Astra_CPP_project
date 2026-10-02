@@ -1,144 +1,97 @@
 # MiniCluster
 
-MiniCluster is a dependency-free C++17 implementation of **2D K-Means clustering**. It groups unlabeled customer records using annual income and spending score, then explains the result with quality metrics, outlier detection, CSV export, and matching SVG/PNG scatter plots.
+MiniCluster is a dependency-free C++17 application for **2D K-Means clustering**. It groups customer records using annual income and spending score, reports clustering quality, flags unusual points, exports CSV/SVG/PNG results, and provides both flag-based and interactive workflows.
 
-This is intentionally an analysis tool rather than an algorithm snippet: initialization is interchangeable, experiments are repeatable, difficult cases are handled defensively, and the result is easy to present.
+The project is deliberately structured to demonstrate object-oriented design: every extensible concern is represented by a focused abstract base class and selected at runtime through polymorphism.
 
-## Example result
+## Highlights
 
-The plot below was generated from the included 930-record customer dataset using `k = 6` and K-Means++ initialization. Each dot is a customer, colour is its final cluster, and an `X` marks the cluster centroid.
+- K-Means with **random** or **K-Means++** centroid initialization.
+- Euclidean, Manhattan, and Chebyshev distance metrics.
+- Polymorphic CSV/TSV/demo data loaders with flexible column selection and strict parsing.
+- Inertia and silhouette metric objects, cluster diagnostics, and outlier detection.
+- CSV, SVG, and PNG exporters using RAII and `std::unique_ptr` ownership.
+- Interactive terminal menu with safe input handling and a normal command-line workflow.
+- No third-party dependencies and no CMake: build with a plain C++17 compiler and `make`.
 
-![MiniCluster result for the 930-customer dataset](docs/minicluster_930_customer_plot.svg)
+## Architecture
 
-The data has overlapping, unevenly spread profiles rather than perfectly circular groups. That makes the cluster boundaries and diagnostics worth discussing in a project presentation.
+```mermaid
+classDiagram
+    class DataPoint {
+        +double x
+        +double y
+        +norm2() double
+    }
+    class KMeans {
+        +fit(data)
+        +clusters()
+        +inertia()
+    }
+    class CentroidInitializer {
+        <<abstract>>
+        +initialize(data, k, generator, metric)
+    }
+    class RandomInitializer
+    class KMeansPlusPlusInitializer
+    class DistanceMetric {
+        <<abstract>>
+        +operator()(a, b) double
+        +name() string
+    }
+    class EuclideanMetric
+    class ManhattanMetric
+    class ChebyshevMetric
+    class DataLoader {
+        <<abstract>>
+        +load() vector~DataPoint~
+        +describe() string
+    }
+    class CsvLoader
+    class TsvLoader
+    class DemoLoader
+    class Exporter {
+        <<abstract>>
+        +write(file, data, clusters)
+    }
+    class CsvExporter
+    class SvgExporter
+    class PngExporter
+    class ClusterMetric {
+        <<abstract>>
+        +compute(data, clusters) double
+    }
+    class InertiaMetric
+    class SilhouetteMetric
+    class MenuAction {
+        <<abstract>>
+        +label() string
+        +run(session)
+    }
+    class InteractiveCli
+    class Pipeline
 
-## Features
-
-- **Pluggable initialization:** random and K-Means++ strategies implement the `CentroidInitializer` interface.
-- **Reproducible results:** a configurable seed makes runs easy to repeat and compare.
-- **Robust convergence:** tolerance and iteration guards, plus empty-cluster recovery.
-- **Diagnostics:** inertia, silhouette score, cluster size, average/max radius, and outlier candidates.
-- **Visual output:** point-assignment CSV plus matching presentation-ready SVG and PNG plots.
-- **Zero dependencies:** builds with a standard C++17 compiler and `make`; CMake is not used.
-
-## The K-Means algorithm
-
-Let `X = {x_1, x_2, ..., x_n}` be the dataset. Each customer is a two-dimensional point:
-
-```text
-x_i = (annual_income_i, spending_score_i)
+    KMeans --> CentroidInitializer : owns
+    KMeans --> DistanceMetric : owns
+    CentroidInitializer <|-- RandomInitializer
+    CentroidInitializer <|-- KMeansPlusPlusInitializer
+    DistanceMetric <|-- EuclideanMetric
+    DistanceMetric <|-- ManhattanMetric
+    DistanceMetric <|-- ChebyshevMetric
+    DataLoader <|-- CsvLoader
+    CsvLoader <|-- TsvLoader
+    DataLoader <|-- DemoLoader
+    Exporter <|-- CsvExporter
+    Exporter <|-- SvgExporter
+    Exporter <|-- PngExporter
+    ClusterMetric <|-- InertiaMetric
+    ClusterMetric <|-- SilhouetteMetric
+    InteractiveCli --> MenuAction : owns many
+    Pipeline --> DataLoader : owns
+    Pipeline --> KMeans : owns
+    Pipeline --> ClusterMetric : owns many
+    Pipeline --> Exporter : owns many
 ```
-
-For a selected number of clusters `k`, the algorithm finds centroids `mu_1, mu_2, ..., mu_k` that make members of each cluster close to one another.
-
-### 1. Distance between customers
-
-MiniCluster uses Euclidean distance. For points `p = (p_x, p_y)` and `q = (q_x, q_y)`:
-
-```text
-distance(p, q) = sqrt((p_x - q_x)^2 + (p_y - q_y)^2)
-```
-
-During assignment, the implementation uses squared distance. It identifies the same nearest centroid while avoiding unnecessary square-root calculations:
-
-```text
-squaredDistance(p, q) = (p_x - q_x)^2 + (p_y - q_y)^2
-```
-
-### 2. Initialize centroids
-
-The starting positions affect the local optimum that K-Means reaches.
-
-**Random initialization** samples `k` distinct input points. It is useful as a baseline but can choose nearby initial centroids.
-
-**K-Means++** selects the first centroid at random. Each following centroid is selected with probability proportional to its squared distance from the closest already-selected centroid:
-
-```text
-P(x_i is chosen) = D(x_i)^2 / sum(D(x_j)^2)
-```
-
-`D(x_i)` is the distance from `x_i` to its nearest selected centroid. This spreads seeds through the data and generally produces more stable clusters.
-
-### 3. Assign points to the nearest centroid
-
-Every customer is assigned to the closest centroid:
-
-```text
-cluster(x_i) = argmin_j squaredDistance(x_i, mu_j)
-```
-
-The code stores original point indices in each `Cluster`, allowing later diagnostics and CSV export without copying the input data.
-
-### 4. Recalculate centroid positions
-
-For cluster `C_j`, its new centroid is the arithmetic mean of all members:
-
-```text
-mu_j = (1 / |C_j|) * sum(x_i), for every x_i in C_j
-```
-
-In this project, that means averaging annual income and spending score separately.
-
-### 5. Repeat until convergence
-
-The assignment and update steps repeat until the largest centroid movement is below the configured tolerance (`0.0001` by default), or the maximum iteration count is reached:
-
-```text
-max_j distance(old_mu_j, new_mu_j) <= tolerance
-```
-
-If a cluster becomes empty, MiniCluster moves its centroid to a poorly represented point. That prevents division by zero and lets the model recover instead of emitting an invalid result.
-
-## Metrics and diagnostics
-
-### Inertia: compactness
-
-Inertia is the objective K-Means minimizes: the total squared distance of every point from its assigned centroid.
-
-```text
-inertia = sum_j sum_(x_i in C_j) squaredDistance(x_i, mu_j)
-```
-
-For the same dataset and `k`, smaller inertia means tighter clusters. Do not compare inertia alone across different `k` values, since adding clusters nearly always lowers it.
-
-### Silhouette score: separation versus overlap
-
-For a point `i`, let `a(i)` be its average distance to members of its own cluster. Let `b(i)` be the smallest average distance to another cluster. The silhouette value is:
-
-```text
-s(i) = (b(i) - a(i)) / max(a(i), b(i))
-```
-
-The program reports the average `s(i)` across all points.
-
-| Score | Meaning |
-| --- | --- |
-| Near `1` | Compact, clearly separated clusters |
-| Near `0` | Overlap or points near cluster boundaries |
-| Below `0` | A point may fit another cluster better |
-
-The included varied dataset usually gives a moderate score, which is expected because its customer profiles overlap.
-
-### Radius and outlier candidates
-
-For each cluster, the report gives the average and maximum distance from its centroid. A point is flagged when its distance is at least `2.5` standard deviations above its cluster's mean distance:
-
-```text
-z_i = (distance(x_i, mu_j) - mean_j) / standardDeviation_j
-outlier when z_i >= 2.5
-```
-
-This is an investigation cue, not a claim that a customer record is wrong.
-
-## Dataset
-
-`data/mall_customers_large.csv` contains **930 synthetic customer records** with these columns:
-
-```text
-annual_income_k,spending_score
-```
-
-It combines six profiles with different variance and income/spending correlation, along with 30 atypical customers. The profiles intentionally overlap, and the data contains no personal information.
 
 ## Build and test
 
@@ -147,64 +100,100 @@ make
 make test
 ```
 
-`make` creates `build/minicluster`. `make test` compiles and runs the deterministic regression test.
+`make test` runs distance-metric tests, polymorphic initializer tests, CSV loader tests for header/semicolon/CRLF/bad-row/missing-file cases, golden K-Means regressions, and scripted interactive-menu tests.
 
-## Run the project
+## Command-line usage
 
-Run the realistic dataset with six clusters and create polished graph files:
-
-```bash
-./build/minicluster --input data/mall_customers_large.csv --k 6 --init kmeans++ --seed 42 --graph cluster_plot
-```
-
-Generate the graph and point-assignment CSV:
+Run the included 930-record dataset with the compatibility configuration:
 
 ```bash
 ./build/minicluster \
   --input data/mall_customers_large.csv \
-  --k 6 \
-  --init kmeans++ \
-  --seed 42 \
-  --graph cluster_plot.svg \
-  --export cluster_assignments.csv
+  --k 6 --init kmeans++ --metric euclidean --seed 42 \
+  --graph cluster_plot --export cluster_assignments.csv
 ```
 
-Compare initialization strategies with the same seed:
+This writes `cluster_plot.svg`, `cluster_plot.png`, and `cluster_assignments.csv`.
 
-```bash
-./build/minicluster --input data/mall_customers_large.csv --k 6 --init random --seed 42
-./build/minicluster --input data/mall_customers_large.csv --k 6 --init kmeans++ --seed 42
-```
-
-## Command-line options
-
-| Option | Purpose |
+| Option | Meaning |
 | --- | --- |
-| `--input file.csv` | Load the first two numeric columns of a CSV, TSV, or semicolon-delimited file |
-| `--demo` | Generate a small built-in example dataset |
+| `--input FILE` | CSV/TSV input file |
+| `--demo` | Use the built-in synthetic customer data |
 | `--k N` | Number of clusters |
 | `--init random\|kmeans++` | Centroid initialization strategy |
-| `--seed N` | Reproducible random seed |
-| `--max-iterations N` | Maximum assignment/update rounds |
-| `--graph file` | Save matching color-coded `file.svg` and `file.png` plots |
-| `--export file.csv` | Save `point_id,x,y,cluster` assignments |
+| `--metric euclidean\|manhattan\|chebyshev` | Distance metric used for assignment and diagnostics |
+| `--seed N` | Deterministic random seed |
+| `--max-iterations N` | Iteration safety limit |
+| `--x-col N`, `--y-col N` | Zero-based input-column indexes |
+| `--delimiter C` | Explicit `,`, `;`, or tab delimiter |
+| `--no-header` | Interpret the first content row as data |
+| `--strict` | Stop on invalid rows instead of warning and skipping them |
+| `--export FILE` | Write point-to-cluster assignments as CSV |
+| `--graph BASE` | Write `BASE.svg` and `BASE.png` |
+| `--interactive` | Open the interactive menu |
+
+## Interactive mode
+
+Start it with no arguments or explicitly with:
+
+```bash
+./build/minicluster --interactive
+```
+
+The menu can load data, set `k`, choose initializer/metric, set a seed, run clustering, inspect outliers, export one result, and compare initializers with the same seed. It validates every prompt and returns friendly messages when an operation needs data or a finished run.
+
+Example session:
+
+```text
+MiniCluster interactive mode
+1. Load data
+2. Set k
+3. Choose initializer
+...
+Choice: 1
+File path: data/mall_customers_large.csv
+X column [0]:
+Y column [1]:
+Delimiter (auto, comma, semicolon, tab) [auto]:
+Loaded 930 rows from CSV data from data/mall_customers_large.csv.
+
+Choice: 2
+Number of clusters [6]: 6
+Choice: 3
+Initializer [kmeans++]: kmeans++
+Choice: 5
+Seed (Enter keeps current) [42]: 42
+Choice: 6
+Iterations: 46 | converged: yes | inertia: 211729.084 | silhouette: 0.398
+```
+
+## How the algorithm works
+
+For every customer `x_i`, K-Means assigns it to the nearest centroid `mu_j`, recalculates each centroid as the average of its members, then repeats until centroids move less than the tolerance or the iteration limit is reached.
+
+```text
+cluster(x_i) = argmin_j metric(x_i, mu_j)
+mu_j = (1 / |C_j|) * sum(x_i in C_j)
+```
+
+Euclidean assignment uses the equivalent squared value internally where appropriate. That avoids unnecessary square roots while preserving which centroid is nearest. If a cluster becomes empty, its centroid is moved to the worst-represented point so averaging never divides by zero.
+
+**Inertia** is the sum of squared Euclidean distances from points to their assigned centroid. **Silhouette** compares a point's average distance inside its own cluster to its nearest other cluster. Outlier candidates are points whose distance from their own centroid is at least 2.5 standard deviations above their cluster's average.
 
 ## Project structure
 
 ```text
-include/data_point.h     2D point type and distance operations
-include/initializers.h   Initializer interface and implementations
-include/kmeans.h         Cluster type and K-Means public API
-include/analytics.h      Silhouette, compactness, and outlier calculations
-include/chart.h          SVG and PNG graph export interfaces
-src/                     Algorithm, CSV, diagnostics, graph, and CLI code
-data/                    Synthetic customer datasets
-docs/                    README visual assets
-tests/                   Deterministic regression test
+include/data_point.h       2D value type and arithmetic
+include/distance_metric.h  DistanceMetric hierarchy and factory
+include/initializers.h     CentroidInitializer hierarchy and factory
+include/kmeans.h           Core K-Means model
+include/analytics.h        ClusterMetric hierarchy and diagnostics helper
+include/data_loader.h      DataLoader hierarchy and CSV options
+include/exporter.h         CSV/SVG/PNG exporter hierarchy
+include/interactive_cli.h  Menu actions and session-driven CLI
+include/pipeline.h         Non-interactive load-fit-report-export pipeline
+src/                       Implementations
+tests/test_kmeans.cpp      Regression and integration coverage
+data/                      Synthetic customer CSV datasets
+docs/                      Plot assets used by documentation
 ```
-
-## Complexity and limitations
-
-Each K-Means iteration is approximately `O(n * k * d)`, where `n` is the number of records, `k` is the number of clusters, and `d = 2` dimensions here. Silhouette calculation is roughly `O(n^2)` because it compares point-to-point distances; that is still practical for this 930-record dataset.
-
-K-Means works best for roughly compact, similarly scaled groups. Normalize features before using data with very different numeric ranges. The algorithm is sensitive to outliers and requires choosing `k`, so use inertia, silhouette score, and domain knowledge together rather than relying on one metric.
