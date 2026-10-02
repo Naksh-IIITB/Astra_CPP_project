@@ -19,7 +19,7 @@ double averageDistanceToCluster(const DataPoint& point,
     size_t count = 0;
     for (size_t member : cluster.memberIndices) {
         if (member != ownIndex) {
-            total += distance(point, data[member]);
+            total += euclideanDistance(point, data[member]);
             ++count;
         }
     }
@@ -61,7 +61,7 @@ vector<ClusterSummary> summarizeClusters(const vector<DataPoint>& data,
         double totalDistance = 0.0;
         double maximumDistance = 0.0;
         for (size_t pointIndex : cluster.memberIndices) {
-            const double memberDistance = distance(data[pointIndex], cluster.centroid);
+            const double memberDistance = euclideanDistance(data[pointIndex], cluster.centroid);
             totalDistance += memberDistance;
             maximumDistance = max(maximumDistance, memberDistance);
         }
@@ -83,7 +83,7 @@ vector<size_t> findOutliers(const vector<DataPoint>& data,
         vector<double> distances;
         distances.reserve(cluster.memberIndices.size());
         for (size_t pointIndex : cluster.memberIndices) {
-            distances.push_back(distance(data[pointIndex], cluster.centroid));
+            distances.push_back(euclideanDistance(data[pointIndex], cluster.centroid));
         }
         const double mean = accumulate(distances.begin(), distances.end(), 0.0) /
                             static_cast<double>(distances.size());

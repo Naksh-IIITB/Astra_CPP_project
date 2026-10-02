@@ -4,44 +4,43 @@
 #include "initializers.h"
 
 #include <cstddef>
+#include <memory>
 #include <random>
 #include <vector>
 
-using namespace std;
-
 struct Cluster {
     DataPoint centroid;
-    vector<size_t> memberIndices;
+    std::vector<std::size_t> memberIndices;
 };
 
 class KMeans {
 public:
-    KMeans(size_t clusterCount,
-           const CentroidInitializer& initializer,
-           size_t maxIterations = 100,
+    KMeans(std::size_t clusterCount,
+           std::unique_ptr<CentroidInitializer> initializer,
+           std::size_t maxIterations = 100,
            double tolerance = 1e-4,
-           unsigned int seed = random_device{}());
+           unsigned int seed = std::random_device{}());
 
-    void fit(const vector<DataPoint>& data);
+    void fit(const std::vector<DataPoint>& data);
 
-    const vector<Cluster>& clusters() const noexcept;
-    size_t iterations() const noexcept;
+    const std::vector<Cluster>& clusters() const noexcept;
+    std::size_t iterations() const noexcept;
     bool converged() const noexcept;
     double inertia() const noexcept;
 
     void printResults() const;
 
 private:
-    void assignPoints(const vector<DataPoint>& data);
-    bool updateCentroids(const vector<DataPoint>& data);
+    void assignPoints(const std::vector<DataPoint>& data);
+    bool updateCentroids(const std::vector<DataPoint>& data);
 
-    size_t clusterCount_;
-    const CentroidInitializer& initializer_;
-    size_t maxIterations_;
+    std::size_t clusterCount_;
+    std::unique_ptr<CentroidInitializer> initializer_;
+    std::size_t maxIterations_;
     double tolerance_;
-    mt19937 generator_;
-    vector<Cluster> clusters_;
-    size_t iterations_{};
+    std::mt19937 generator_;
+    std::vector<Cluster> clusters_;
+    std::size_t iterations_{};
     bool converged_{};
     double inertia_{};
 };

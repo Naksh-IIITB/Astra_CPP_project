@@ -6,27 +6,25 @@
 #include <limits>
 #include <stdexcept>
 
-using namespace std;
-
-KMeans::KMeans(size_t clusterCount,
-               const CentroidInitializer& initializer,
-               size_t maxIterations,
+KMeans::KMeans(std::size_t clusterCount,
+               std::unique_ptr<CentroidInitializer> initializer,
+               std::size_t maxIterations,
                double tolerance,
                unsigned int seed)
-    : clusterCount_(clusterCount), initializer_(initializer), maxIterations_(maxIterations),
+    : clusterCount_(clusterCount), initializer_(std::move(initializer)), maxIterations_(maxIterations),
       tolerance_(tolerance), generator_(seed) {
-    if (clusterCount == 0 || maxIterations == 0 || tolerance < 0.0) {
-        throw invalid_argument("invalid K-Means configuration");
+    if (clusterCount == 0 || maxIterations == 0 || tolerance < 0.0 || !initializer_) {
+        throw std::invalid_argument("invalid K-Means configuration");
     }
 }
 
-void KMeans::fit(const vector<DataPoint>& data) {
+void KMeans::fit(const std::vector<DataPoint>& data) {
     if (data.empty() || clusterCount_ > data.size()) {
-        throw invalid_argument("data must contain at least as many points as clusters");
+        throw std::invalid_argument("data must contain at least as many points as clusters");
     }
 
     clusters_.clear();
-    for (const DataPoint& centroid : initializer_.initialize(data, clusterCount_, generator_)) {
+    for (const DataPoint& centroid : initializer_->initialize(data, clusterCount_, generator_)) {
         clusters_.push_back({centroid, {}});
     }
 
@@ -50,14 +48,14 @@ void KMeans::fit(const vector<DataPoint>& data) {
     }
 }
 
-void KMeans::assignPoints(const vector<DataPoint>& data) {
+void KMeans::assignPoints(const std::vector<DataPoint>& data) {
     for (Cluster& cluster : clusters_) {
         cluster.memberIndices.clear();
     }
-    for (size_t pointIndex = 0; pointIndex < data.size(); ++pointIndex) {
-        size_t nearestCluster = 0;
+    for (std::size_t pointIndex = 0; pointIndex < data.size(); ++pointIndex) {
+        std::size_t nearestCluster = 0;
         double nearestDistance = squaredDistance(data[pointIndex], clusters_.front().centroid);
-        for (size_t clusterIndex = 1; clusterIndex < clusters_.size(); ++clusterIndex) {
+        for (std::size_t clusterIndex = 1; clusterIndex < clusters_.size(); ++clusterIndex) {
             const double candidate = squaredDistance(data[pointIndex], clusters_[clusterIndex].centroid);
             if (candidate < nearestDistance) {
                 nearestDistance = candidate;
@@ -68,19 +66,19 @@ void KMeans::assignPoints(const vector<DataPoint>& data) {
     }
 }
 
-bool KMeans::updateCentroids(const vector<DataPoint>& data) {
+bool KMeans::updateCentroids(const std::vector<DataPoint>& data) {
     double greatestShift = 0.0;
-    for (size_t index = 0; index < clusters_.size(); ++index) {
+    for (std::size_t index = 0; index < clusters_.size(); ++index) {
         Cluster& cluster = clusters_[index];
         DataPoint updated{};
         if (cluster.memberIndices.empty()) {
             // Recover an empty cluster by relocating it to the most poorly represented point.
-            size_t farthestPoint = 0;
+            std::size_t farthestPoint = 0;
             double farthestDistance = -1.0;
-            for (size_t point = 0; point < data.size(); ++point) {
-                double nearestDistance = numeric_limits<double>::infinity();
+            for (std::size_t point = 0; point < data.size(); ++point) {
+                double nearestDistance = std::numeric_limits<double>::infinity();
                 for (const Cluster& candidate : clusters_) {
-                    nearestDistance = min(nearestDistance,
+                    nearestDistance = std::min(nearestDistance,
                                           squaredDistance(data[point], candidate.centroid));
                 }
                 if (nearestDistance > farthestDistance) {
@@ -91,26 +89,26 @@ bool KMeans::updateCentroids(const vector<DataPoint>& data) {
             updated = data[farthestPoint];
         } else {
             for (size_t pointIndex : cluster.memberIndices) {
-                updated = updated + data[pointIndex];
+                updated += data[pointIndex];
             }
             updated = updated / cluster.memberIndices.size();
         }
-        greatestShift = max(greatestShift, distance(cluster.centroid, updated));
+        greatestShift = std::max(greatestShift, euclideanDistance(cluster.centroid, updated));
         cluster.centroid = updated;
     }
     return greatestShift <= tolerance_;
 }
 
-const vector<Cluster>& KMeans::clusters() const noexcept { return clusters_; }
-size_t KMeans::iterations() const noexcept { return iterations_; }
+const std::vector<Cluster>& KMeans::clusters() const noexcept { return clusters_; }
+std::size_t KMeans::iterations() const noexcept { return iterations_; }
 bool KMeans::converged() const noexcept { return converged_; }
 double KMeans::inertia() const noexcept { return inertia_; }
 
 void KMeans::printResults() const {
-    cout << fixed << setprecision(3);
-    for (size_t index = 0; index < clusters_.size(); ++index) {
+    std::cout << std::fixed << std::setprecision(3);
+    for (std::size_t index = 0; index < clusters_.size(); ++index) {
         const Cluster& cluster = clusters_[index];
-        cout << "Cluster " << index + 1 << ": centroid (" << cluster.centroid.x << ", "
-             << cluster.centroid.y << "), members: " << cluster.memberIndices.size() << '\n';
+        std::cout << "Cluster " << index + 1 << ": centroid " << cluster.centroid
+                  << ", members: " << cluster.memberIndices.size() << '\n';
     }
 }

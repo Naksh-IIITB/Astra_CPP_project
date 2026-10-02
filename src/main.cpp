@@ -108,11 +108,14 @@ int main(int argc, char* argv[]) {
     try {
         const Options options = parseOptions(argc, argv);
         const vector<DataPoint> data = options.demo ? demoData(options.seed) : readPointsFromCsv(options.input);
-        unique_ptr<CentroidInitializer> initializer = options.initializer == "random"
-            ? unique_ptr<CentroidInitializer>(new RandomInitializer())
-            : unique_ptr<CentroidInitializer>(new KMeansPlusPlusInitializer());
+        std::unique_ptr<CentroidInitializer> initializer;
+        if (options.initializer == "random") {
+            initializer = std::make_unique<RandomInitializer>();
+        } else {
+            initializer = std::make_unique<KMeansPlusPlusInitializer>();
+        }
 
-        KMeans model(options.clusters, *initializer, options.maxIterations, 1e-4, options.seed);
+        KMeans model(options.clusters, std::move(initializer), options.maxIterations, 1e-4, options.seed);
         model.fit(data);
         const auto summaries = summarizeClusters(data, model.clusters());
         const auto outliers = findOutliers(data, model.clusters());

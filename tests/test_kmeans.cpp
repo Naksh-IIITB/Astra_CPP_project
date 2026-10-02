@@ -9,8 +9,7 @@ using namespace std;
 
 int main() {
     const vector<DataPoint> data{{0, 0}, {0, 1}, {1, 0}, {10, 10}, {10, 11}, {11, 10}};
-    KMeansPlusPlusInitializer initializer;
-    KMeans model(2, initializer, 100, 1e-8, 17);
+    KMeans model(2, std::make_unique<KMeansPlusPlusInitializer>(), 100, 1e-8, 17);
     model.fit(data);
 
     assert(model.converged());
