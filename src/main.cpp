@@ -1,5 +1,5 @@
 #include "analytics.h"
-#include "csv_io.h"
+#include "data_loader.h"
 #include "exporter.h"
 #include "distance_metric.h"
 #include "initializers.h"
@@ -26,6 +26,7 @@ struct Options {
     string input;
     string exportFile;
     string graphFile;
+    CsvOptions csvOptions;
     bool demo = false;
 };
 
@@ -38,7 +39,12 @@ void printUsage() {
          << "  --seed N           deterministic random seed (default: 42)\n"
          << "  --max-iterations N convergence limit (default: 200)\n"
          << "  --export file.csv  write point-to-cluster assignments\n"
-         << "  --graph file       write matching .svg and .png cluster plots\n";
+         << "  --graph file       write matching .svg and .png cluster plots\n"
+         << "  --x-col N          zero-based x column (default: 0)\n"
+         << "  --y-col N          zero-based y column (default: 1)\n"
+         << "  --delimiter C      CSV delimiter: comma, semicolon, or tab\n"
+         << "  --no-header        treat first content row as data\n"
+         << "  --strict           fail instead of skipping invalid input rows\n";
 }
 
 size_t positiveSize(const string& value, const string& option) {
@@ -71,6 +77,16 @@ Options parseOptions(int argc, char* argv[]) {
         else if (argument == "--input") options.input = value();
         else if (argument == "--export") options.exportFile = value();
         else if (argument == "--graph") options.graphFile = value();
+        else if (argument == "--x-col") options.csvOptions.xColumn = static_cast<size_t>(stoul(value()));
+        else if (argument == "--y-col") options.csvOptions.yColumn = static_cast<size_t>(stoul(value()));
+        else if (argument == "--delimiter") {
+            const string delimiter = value();
+            if (delimiter.size() != 1 || (delimiter[0] != ',' && delimiter[0] != ';' && delimiter[0] != '\t')) {
+                throw invalid_argument("--delimiter must be ',', ';', or a tab character");
+            }
+            options.csvOptions.delimiter = delimiter[0];
+        } else if (argument == "--no-header") options.csvOptions.hasHeader = false;
+        else if (argument == "--strict") options.csvOptions.skipBadRows = false;
         else throw invalid_argument("unknown option: " + argument);
     }
     if ((options.demo && !options.input.empty()) || (!options.demo && options.input.empty())) {
@@ -80,18 +96,6 @@ Options parseOptions(int argc, char* argv[]) {
         throw invalid_argument("--init must be kmeans++ or random");
     }
     return options;
-}
-
-vector<DataPoint> demoData(unsigned int seed) {
-    mt19937 generator(seed);
-    const vector<DataPoint> centers{{20, 80}, {52, 45}, {82, 18}};
-    normal_distribution<double> spread(0.0, 6.5);
-    vector<DataPoint> data;
-    for (const DataPoint& center : centers) {
-        for (int index = 0; index < 35; ++index) data.push_back({center.x + spread(generator), center.y + spread(generator)});
-    }
-    data.push_back({5, 8});  // A deliberately unusual customer for the outlier report.
-    return data;
 }
 
 string graphBase(string filename) {
@@ -111,7 +115,10 @@ string graphBase(string filename) {
 int main(int argc, char* argv[]) {
     try {
         const Options options = parseOptions(argc, argv);
-        const vector<DataPoint> data = options.demo ? demoData(options.seed) : readPointsFromCsv(options.input);
+        unique_ptr<DataLoader> loader = options.demo
+            ? unique_ptr<DataLoader>(make_unique<DemoLoader>(options.seed))
+            : makeLoader(options.input, options.csvOptions);
+        const vector<DataPoint> data = loader->load();
         std::unique_ptr<CentroidInitializer> initializer;
         if (options.initializer == "random") {
             initializer = std::make_unique<RandomInitializer>();

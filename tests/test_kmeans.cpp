@@ -2,8 +2,10 @@
 #include "distance_metric.h"
 #include "initializers.h"
 #include "kmeans.h"
+#include "data_loader.h"
 
 #include <cassert>
+#include <fstream>
 #include <iostream>
 
 using namespace std;
@@ -28,5 +30,22 @@ int main() {
     assert(model.inertia() < 5.0);
     const SilhouetteMetric silhouetteMetric;
     assert(silhouetteMetric.compute(data, model.clusters()) > 0.8);
+
+    const std::string csvPath = "/private/tmp/minicluster_loader.csv";
+    const std::string semicolonPath = "/private/tmp/minicluster_loader_semicolon.csv";
+    const std::string crlfPath = "/private/tmp/minicluster_loader_crlf.csv";
+    const std::string badPath = "/private/tmp/minicluster_loader_bad.csv";
+    { std::ofstream csv(csvPath); csv << "x,y\n1,2\n3,4\n"; }
+    { std::ofstream csv(semicolonPath); csv << "x;y\n1;2\n"; }
+    { std::ofstream csv(crlfPath, std::ios::binary); csv << "x,y\r\n1,2\r\n"; }
+    { std::ofstream csv(badPath); csv << "x,y\n1,2\nbad,row\n"; }
+    assert(CsvLoader(csvPath).load().size() == 2);
+    assert(CsvLoader(semicolonPath).load().size() == 1);
+    assert(CsvLoader(crlfPath).load().size() == 1);
+    assert(CsvLoader(badPath).load().size() == 1);
+    bool missingFileFailed = false;
+    try { CsvLoader("/private/tmp/no-such-minicluster-file.csv").load(); }
+    catch (const LoadError&) { missingFileFailed = true; }
+    assert(missingFileFailed);
     std::cout << "All MiniCluster tests passed.\n";
 }
