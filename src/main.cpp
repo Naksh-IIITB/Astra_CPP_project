@@ -1,179 +1,104 @@
-#include "analytics.h"
 #include "data_loader.h"
-#include "exporter.h"
-#include "distance_metric.h"
-#include "initializers.h"
-#include "kmeans.h"
+#include "interactive_cli.h"
+#include "pipeline.h"
 
-#include <algorithm>
 #include <cstdlib>
-#include <iomanip>
 #include <iostream>
 #include <memory>
-#include <random>
 #include <stdexcept>
 #include <string>
 
-using namespace std;
-
 namespace {
-struct Options {
-    size_t clusters = 3;
-    size_t maxIterations = 200;
-    unsigned int seed = 42;
-    string initializer = "kmeans++";
-    string metric = "euclidean";
-    string input;
-    string exportFile;
-    string graphFile;
-    CsvOptions csvOptions;
+struct CommandOptions {
+    PipelineOptions pipeline;
+    CsvOptions csv;
+    std::string input;
     bool demo = false;
 };
 
 void printUsage() {
-    cout << "MiniCluster - explainable 2D K-Means\n\n"
-         << "Usage: minicluster [--input file.csv | --demo] [options]\n"
-         << "  --k N              number of clusters (default: 3)\n"
-         << "  --init NAME        kmeans++ or random (default: kmeans++)\n"
-         << "  --metric NAME      euclidean, manhattan, or chebyshev (default: euclidean)\n"
-         << "  --seed N           deterministic random seed (default: 42)\n"
-         << "  --max-iterations N convergence limit (default: 200)\n"
-         << "  --export file.csv  write point-to-cluster assignments\n"
-         << "  --graph file       write matching .svg and .png cluster plots\n"
-         << "  --x-col N          zero-based x column (default: 0)\n"
-         << "  --y-col N          zero-based y column (default: 1)\n"
-         << "  --delimiter C      CSV delimiter: comma, semicolon, or tab\n"
-         << "  --no-header        treat first content row as data\n"
-         << "  --strict           fail instead of skipping invalid input rows\n";
+    std::cout << "MiniCluster - explainable 2D K-Means\n\n"
+              << "Usage: minicluster [--input file.csv | --demo] [options]\n"
+              << "       minicluster --interactive\n\n"
+              << "  --k N              number of clusters (default: 3)\n"
+              << "  --init NAME        kmeans++ or random (default: kmeans++)\n"
+              << "  --metric NAME      euclidean, manhattan, or chebyshev\n"
+              << "  --seed N           deterministic random seed (default: 42)\n"
+              << "  --max-iterations N convergence limit (default: 200)\n"
+              << "  --x-col N          zero-based x column (default: 0)\n"
+              << "  --y-col N          zero-based y column (default: 1)\n"
+              << "  --delimiter C      comma, semicolon, or tab character\n"
+              << "  --no-header        treat first content row as data\n"
+              << "  --strict           fail instead of skipping invalid rows\n"
+              << "  --export file.csv  write point-to-cluster assignments\n"
+              << "  --graph file       write matching .svg and .png plots\n";
 }
 
-size_t positiveSize(const string& value, const string& option) {
+std::size_t parseSize(const std::string& value, const std::string& option, bool allowZero = false) {
     try {
-        const unsigned long parsed = stoul(value);
-        if (parsed == 0) throw invalid_argument("zero");
-        return static_cast<size_t>(parsed);
-    } catch (const exception&) {
-        throw invalid_argument(option + " needs a positive integer");
+        std::size_t consumed = 0;
+        const unsigned long parsed = std::stoul(value, &consumed);
+        if (consumed != value.size() || (!allowZero && parsed == 0)) throw std::invalid_argument("value");
+        return static_cast<std::size_t>(parsed);
+    } catch (const std::exception&) {
+        throw std::invalid_argument(option + " needs a " + (allowZero ? "non-negative" : "positive") + " integer");
     }
 }
 
-Options parseOptions(int argc, char* argv[]) {
-    Options options;
+CommandOptions parseOptions(int argc, char* argv[]) {
+    CommandOptions options;
     for (int index = 1; index < argc; ++index) {
-        const string argument = argv[index];
-        const auto value = [&]() -> string {
-            if (++index >= argc) throw invalid_argument(argument + " needs a value");
+        const std::string argument = argv[index];
+        const auto value = [&]() -> std::string {
+            if (++index >= argc) throw std::invalid_argument(argument + " needs a value");
             return argv[index];
         };
-        if (argument == "--help" || argument == "-h") {
-            printUsage();
-            exit(EXIT_SUCCESS);
-        } else if (argument == "--demo") options.demo = true;
-        else if (argument == "--k") options.clusters = positiveSize(value(), argument);
-        else if (argument == "--max-iterations") options.maxIterations = positiveSize(value(), argument);
-        else if (argument == "--seed") options.seed = static_cast<unsigned int>(positiveSize(value(), argument));
-        else if (argument == "--init") options.initializer = value();
-        else if (argument == "--metric") options.metric = value();
+        if (argument == "--help" || argument == "-h") { printUsage(); std::exit(EXIT_SUCCESS); }
+        else if (argument == "--demo") options.demo = true;
+        else if (argument == "--k") options.pipeline.clusterCount = parseSize(value(), argument);
+        else if (argument == "--max-iterations") options.pipeline.maxIterations = parseSize(value(), argument);
+        else if (argument == "--seed") options.pipeline.seed = static_cast<unsigned int>(parseSize(value(), argument, true));
+        else if (argument == "--init") options.pipeline.initializerName = value();
+        else if (argument == "--metric") options.pipeline.metricName = value();
         else if (argument == "--input") options.input = value();
-        else if (argument == "--export") options.exportFile = value();
-        else if (argument == "--graph") options.graphFile = value();
-        else if (argument == "--x-col") options.csvOptions.xColumn = static_cast<size_t>(stoul(value()));
-        else if (argument == "--y-col") options.csvOptions.yColumn = static_cast<size_t>(stoul(value()));
+        else if (argument == "--export") options.pipeline.exportFile = value();
+        else if (argument == "--graph") options.pipeline.graphFile = value();
+        else if (argument == "--x-col") options.csv.xColumn = parseSize(value(), argument, true);
+        else if (argument == "--y-col") options.csv.yColumn = parseSize(value(), argument, true);
         else if (argument == "--delimiter") {
-            const string delimiter = value();
+            const std::string delimiter = value();
             if (delimiter.size() != 1 || (delimiter[0] != ',' && delimiter[0] != ';' && delimiter[0] != '\t')) {
-                throw invalid_argument("--delimiter must be ',', ';', or a tab character");
+                throw std::invalid_argument("--delimiter must be ',', ';', or a tab character");
             }
-            options.csvOptions.delimiter = delimiter[0];
-        } else if (argument == "--no-header") options.csvOptions.hasHeader = false;
-        else if (argument == "--strict") options.csvOptions.skipBadRows = false;
-        else throw invalid_argument("unknown option: " + argument);
+            options.csv.delimiter = delimiter[0];
+        } else if (argument == "--no-header") options.csv.hasHeader = false;
+        else if (argument == "--strict") options.csv.skipBadRows = false;
+        else if (argument == "--interactive") throw std::invalid_argument("--interactive cannot be combined with other options");
+        else throw std::invalid_argument("unknown option: " + argument);
     }
     if ((options.demo && !options.input.empty()) || (!options.demo && options.input.empty())) {
-        throw invalid_argument("choose exactly one of --demo or --input");
-    }
-    if (options.initializer != "kmeans++" && options.initializer != "random") {
-        throw invalid_argument("--init must be kmeans++ or random");
+        throw std::invalid_argument("choose exactly one of --demo or --input");
     }
     return options;
-}
-
-string graphBase(string filename) {
-    const string svgExtension = ".svg";
-    const string pngExtension = ".png";
-    if (filename.size() >= svgExtension.size() &&
-        filename.compare(filename.size() - svgExtension.size(), svgExtension.size(), svgExtension) == 0) {
-        filename.resize(filename.size() - svgExtension.size());
-    } else if (filename.size() >= pngExtension.size() &&
-               filename.compare(filename.size() - pngExtension.size(), pngExtension.size(), pngExtension) == 0) {
-        filename.resize(filename.size() - pngExtension.size());
-    }
-    return filename;
 }
 }  // namespace
 
 int main(int argc, char* argv[]) {
     try {
-        const Options options = parseOptions(argc, argv);
-        unique_ptr<DataLoader> loader = options.demo
-            ? unique_ptr<DataLoader>(make_unique<DemoLoader>(options.seed))
-            : makeLoader(options.input, options.csvOptions);
-        const vector<DataPoint> data = loader->load();
-        std::unique_ptr<CentroidInitializer> initializer;
-        if (options.initializer == "random") {
-            initializer = std::make_unique<RandomInitializer>();
-        } else {
-            initializer = std::make_unique<KMeansPlusPlusInitializer>();
+        if (argc == 1 || (argc == 2 && std::string(argv[1]) == "--interactive")) {
+            InteractiveCli().run();
+            return EXIT_SUCCESS;
         }
-
-        KMeans model(options.clusters, std::move(initializer), options.maxIterations, 1e-4, options.seed,
-                     makeMetric(options.metric));
-        model.fit(data);
-        const ClusterDiagnostics diagnostics(model.metric());
-        const auto summaries = diagnostics.summarize(data, model.clusters());
-        const auto outliers = diagnostics.findOutliers(data, model.clusters());
-        const InertiaMetric inertiaMetric;
-        const SilhouetteMetric silhouetteMetric(makeMetric(options.metric));
-
-        cout << fixed << setprecision(3);
-        cout << "MiniCluster report\n"
-             << "==================\n"
-             << "Points: " << data.size() << " | K: " << options.clusters
-             << " | initializer: " << options.initializer << " | metric: " << model.metric().name()
-             << " | seed: " << options.seed << "\n"
-             << "Iterations: " << model.iterations() << " | converged: " << (model.converged() ? "yes" : "no")
-             << " | inertia: " << inertiaMetric.compute(data, model.clusters()) << " | silhouette: "
-             << silhouetteMetric.compute(data, model.clusters()) << "\n\n";
-        model.printResults();
-        cout << "\nCompactness diagnostics\n";
-        for (const auto& summary : summaries) {
-            cout << "  C" << summary.index + 1 << ": avg radius " << summary.averageDistance
-                 << ", max radius " << summary.maximumDistance << '\n';
-        }
-        cout << "Outlier candidates (z >= 2.5): ";
-        if (outliers.empty()) cout << "none\n";
-        else {
-            for (size_t index : outliers) cout << '#' << index << ' ';
-            cout << '\n';
-        }
-        if (!options.exportFile.empty()) {
-            const CsvExporter exporter;
-            exporter.write(options.exportFile, data, model.clusters());
-            cout << "\nAssignments written to " << options.exportFile << '\n';
-        }
-        if (!options.graphFile.empty()) {
-            const string base = graphBase(options.graphFile);
-            vector<unique_ptr<Exporter>> exporters;
-            exporters.emplace_back(make_unique<SvgExporter>());
-            exporters.emplace_back(make_unique<PngExporter>());
-            for (const auto& exporter : exporters) {
-                exporter->write(base + "." + exporter->name(), data, model.clusters());
-            }
-            cout << "Cluster graphs written to " << base << ".svg and " << base << ".png\n";
-        }
-    } catch (const exception& error) {
-        cerr << "Error: " << error.what() << "\n\n";
-        printUsage();
-        return EXIT_FAILURE;
+        const CommandOptions options = parseOptions(argc, argv);
+        std::unique_ptr<DataLoader> loader = options.demo
+            ? std::unique_ptr<DataLoader>(std::make_unique<DemoLoader>(options.pipeline.seed))
+            : makeLoader(options.input, options.csv);
+        Pipeline(std::move(loader), options.pipeline).run(std::cout);
+        return EXIT_SUCCESS;
+    } catch (const LoadError& error) {
+        std::cerr << "Load error: " << error.what() << '\n';
+    } catch (const std::exception& error) {
+        std::cerr << "Error: " << error.what() << '\n';
     }
+    return EXIT_FAILURE;
 }
